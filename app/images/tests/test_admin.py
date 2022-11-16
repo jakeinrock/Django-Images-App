@@ -1,5 +1,5 @@
 """
-Test for Django amdin modifications.
+Test for Django admin modifications.
 """
 
 from django.test import TestCase

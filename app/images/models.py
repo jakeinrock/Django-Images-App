@@ -32,8 +32,31 @@ class UserManager(BaseUserManager):
         return user
 
 
+class AccountType(models.Model):
+    """Account Type object."""
+    title = models.CharField(max_length=50, unique=True)
+    is_basic = models.BooleanField(default=False)
+    is_premium = models.BooleanField(default=False)
+    is_enterprise = models.BooleanField(default=False)
+    is_custom = models.BooleanField(default=False)
+    thumb_size1 = models.IntegerField(blank=False)
+    thumb_size2 = models.IntegerField(blank=True, null=True)
+    link_to_original = models.BooleanField(default=False)
+    link_to_binary = models.BooleanField(default=False)
+
+    def __str__(self):
+        return self.title
+
 class User(AbstractBaseUser, PermissionsMixin):
     """User in the system."""
+    account_type = models.ForeignKey(
+        AccountType,
+        related_name='users',
+        on_delete=models.SET_DEFAULT,
+        default=None,
+        null=True,
+        blank=False,
+    )
     email = models.EmailField(max_length=255, unique=True)
     name = models.CharField(max_length=255)
     is_active = models.BooleanField(default=True)

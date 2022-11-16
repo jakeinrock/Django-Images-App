@@ -4,6 +4,7 @@ Tests for models.
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
+from images import models
 
 class ModelTests(TestCase):
     """Test models."""
@@ -47,3 +48,14 @@ class ModelTests(TestCase):
 
         self.assertTrue(user.is_superuser)
         self.assertTrue(user.is_staff)
+
+    def test_create_account_type(self):
+        """Test creating an account type is successful."""
+
+        acc = models.AccountType.objects.create(
+            title='Sample',
+            is_basic=True,
+            thumb_size1=200,
+        )
+
+        self.assertEqual(str(acc), acc.title)
