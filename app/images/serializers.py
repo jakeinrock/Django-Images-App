@@ -11,10 +11,3 @@ class ImageSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'image', 'thumbnail_size1', 'thumbnail_size2']
         read_only_fields = ['id', 'thumbnail_size1', 'thumbnail_size2']
         extra_kwargs = {'image': {'required': 'True'}}
-
-
-class ImageDetailSerializer(ImageSerializer):
-    """Serializer for image detail view."""
-
-    class Meta(ImageSerializer.Meta):
-        fields = ImageSerializer.Meta.fields + ['thumbnail_size1', 'thumbnail_size2']
