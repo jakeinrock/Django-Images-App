@@ -39,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'images',
+    'rest_framework',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -132,3 +134,7 @@ MEDIA_ROOT = '/vol/web/media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'images.User'
+
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
