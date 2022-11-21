@@ -10,7 +10,7 @@ from rest_framework import (
 )
 
 from .serializers import ImageSerializer
-from .models import Image
+from .models import Image, AccountType
 
 class ImageViewSet(mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
@@ -28,7 +28,7 @@ class ImageViewSet(mixins.DestroyModelMixin,
         return self.queryset.filter(user=self.request.user).order_by('-id')
 
     def get_serializer_class(self):
-        if self.action == 'list':
+        if self.action == 'list' or self.action == 'upload':
             return ImageSerializer
 
         return self.serializer_class

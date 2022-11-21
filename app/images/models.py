@@ -4,6 +4,10 @@ Database models.
 import uuid
 import os
 
+import os.path
+from PIL import Image as Img
+from io import BytesIO
+
 from django.conf import settings
 from django.db import models
 from django.contrib.auth.models import (
@@ -11,6 +15,8 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+from django.core.files.base import ContentFile
+from django.core.validators import FileExtensionValidator
 
 def create_uuid_filename(filename):
     """Generate uuid file name."""
@@ -90,12 +96,68 @@ class Image(models.Model):
     """Image object."""
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        related_name='images',
         on_delete=models.CASCADE,
     )
     title = models.CharField(max_length=255)
-    image = models.ImageField(null=True, blank=False, upload_to=image_file_path)
+    image = models.ImageField(
+        null=True, blank=False,
+        upload_to=image_file_path,
+        validators=[
+            FileExtensionValidator(allowed_extensions=['png', 'jpeg', 'jpg'])
+            ]
+        )
     thumbnail_size1 = models.ImageField(null=True, blank=True, upload_to=thumb_file_path)
     thumbnail_size2 = models.ImageField(null=True, blank=True, upload_to=thumb_file_path)
+
+    def save(self, *args, **kwargs):
+        """Save instance."""
+
+        if not self.make_thumbnail():
+            """Set to a default thumbnail."""
+            raise Exception('Could not create thumbnail - is the file type valid?')
+
+        super(Image, self).save(*args, **kwargs)
+
+    def make_thumbnail(self):
+        """Generate a thumbnail from a photo."""
+        thumb_sizes = {}
+        t1 = AccountType.objects.filter(users=self.user)[0].thumb_size1
+        t2 = AccountType.objects.filter(users=self.user)[0].thumb_size2
+        if t1 is not None:
+            thumb_sizes['thumb1'] = t1
+        if t2 is not None:
+            thumb_sizes['thumb2'] = t2
+
+        for thumb_no in thumb_sizes.keys():
+            size = thumb_sizes[thumb_no]
+            img = Img.open(self.image)
+            img.thumbnail((size, size), Img.ANTIALIAS)
+
+            thumb_name, thumb_extension = os.path.splitext(self.image.name)
+            thumb_extension = thumb_extension.lower()
+
+            thumb_filename = thumb_name + '_thumb' + thumb_extension
+
+            if thumb_extension in ['.jpg', '.jpeg']:
+                FTYPE = 'JPEG'
+            elif thumb_extension == '.png':
+                FTYPE = 'PNG'
+            else:
+                return False
+
+            """Save thumbnail to in-memory file as StringIO"""
+            temp_thumb = BytesIO()
+            img.save(temp_thumb, FTYPE)
+            temp_thumb.seek(0)
+
+            if thumb_no == 'thumb1':
+                self.thumbnail_size1.save(thumb_filename, ContentFile(temp_thumb.read()), save=False)
+            if thumb_no == 'thumb2':
+                self.thumbnail_size2.save(thumb_filename, ContentFile(temp_thumb.read()), save=False)
+            temp_thumb.close()
+
+        return True
 
     def __str__(self):
         return self.title
