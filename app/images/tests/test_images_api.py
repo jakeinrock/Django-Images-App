@@ -17,6 +17,7 @@ from images.models import (
     AccountType,
     User,
     Image,
+    BinaryImageLink,
 )
 
 from io import BytesIO
@@ -29,6 +30,10 @@ IMAGES_URL = reverse('image-list')
 def detail_url(image_id):
     """Create and return an image detail URL."""
     return reverse('image-detail', args=[image_id])
+
+def get_link_url(image_id):
+    """Create and return an binary image upload URL."""
+    return reverse('image-get-link', args=[image_id])
 
 def create_user(**params):
     """Create and return a new user."""
@@ -255,3 +260,19 @@ class ImageUploadTests(TestCase):
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertIn('thumbnail_size1', res.data)
         self.assertEqual(height, AccountType.objects.filter(users=self.user)[0].thumb_size1)
+
+    def test_create_binary_image_link(self):
+        """Test creating binary image."""
+        image = Image.objects.create(
+            user=self.user,
+            title='sample',
+            image=get_image_file(),
+        )
+        payload = {'expiring_time': 600}
+        url = get_link_url(image.id)
+
+        res = self.client.post(url, payload, format='json')
+        print(res.data)
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('binary_image', res.data)
+        self.assertEqual(BinaryImageLink.objects.filter(user=self.user).count(), 1)

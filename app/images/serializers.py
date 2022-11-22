@@ -3,7 +3,7 @@ Serializers for images app.
 """
 from rest_framework import serializers
 
-from images.models import Image, AccountType
+from images.models import Image, AccountType, BinaryImageLink
 
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
@@ -30,3 +30,8 @@ class ImageSerializer(serializers.ModelSerializer):
         if check[0].thumb_size2 is None:
             data.pop('thumbnail_size2', None)
         return data
+
+class BinaryImageLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BinaryImageLink
+        fields = ['expiring_time',]

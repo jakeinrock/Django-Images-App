@@ -3,6 +3,7 @@ Database models.
 """
 import uuid
 import os
+import datetime
 
 import os.path
 from PIL import Image as Img
@@ -15,8 +16,13 @@ from django.contrib.auth.models import (
     BaseUserManager,
     PermissionsMixin,
 )
+from django.utils import timezone
 from django.core.files.base import ContentFile
-from django.core.validators import FileExtensionValidator
+from django.core.validators import (
+    FileExtensionValidator,
+    MaxValueValidator,
+    MinValueValidator,
+)
 
 def create_uuid_filename(filename):
     """Generate uuid file name."""
@@ -32,6 +38,14 @@ def image_file_path(instance, filename):
 def thumb_file_path(instance, filename):
     """Generate file path for thumbnail."""
     return os.path.join('uploads', 'thumbs', create_uuid_filename(filename))
+
+def binary_file_path(instance, filename):
+    """Generate file path for binary image."""
+    return os.path.join('uploads', 'binary', create_uuid_filename(filename))
+
+# def get_expiration_date(time):
+#     """Set expiration time for link."""
+#     return datetime.datetime.today() + datetime.timedelta(seconds=time)
 
 
 class UserManager(BaseUserManager):
@@ -117,6 +131,10 @@ class Image(models.Model):
             """Set to a default thumbnail."""
             raise Exception('Could not create thumbnail - is the file type valid?')
 
+        # if not self.make_binary_file():
+        #     """Set to a default binary image."""
+        #     raise Exception('Could not create binary image - is the file type valid?')
+
         super(Image, self).save(*args, **kwargs)
 
     def make_thumbnail(self):
@@ -159,5 +177,56 @@ class Image(models.Model):
 
         return True
 
+    # def make_binary_file(self):
+    #     """Generate a binary image from a photo."""
+    #     img = Img.open(self.image).convert('1')
+
+    #     binary_name, binary_extension = os.path.splitext(self.image.name)
+    #     binary_extension = binary_extension.lower()
+
+    #     binary_filename = binary_name + '_binary' + binary_extension
+
+    #     if binary_extension in ['.jpg', '.jpeg']:
+    #         FTYPE = 'JPEG'
+    #     elif binary_extension == '.png':
+    #         FTYPE = 'PNG'
+    #     else:
+    #         return False
+
+    #     """Save binary image."""
+    #     temp_binary = BytesIO()
+    #     img.save(temp_binary, FTYPE)
+    #     temp_binary.seek(0)
+    #     self.binary_image.save(binary_filename, ContentFile(temp_binary.read()), save=False)
+
+    #     return True
+
     def __str__(self):
         return self.title
+
+
+class BinaryImageLink(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='links',
+        on_delete=models.CASCADE,
+    )
+    binary_image = models.ImageField(null=True, blank=True, upload_to=binary_file_path)
+    expiring_time = models.IntegerField(
+        blank=False,
+        null=True,
+        validators=[
+            MinValueValidator(300),
+            MaxValueValidator(30000),
+    ])
+    created_at = models.DateTimeField(editable=False, default=timezone.now)
+    expiration_date = models.DateTimeField(default=None)
+
+    def save(self, *args, **kwargs):
+        """Save instance."""
+        if self.expiration_date is None:
+            self.expiration_date = datetime.datetime.now() + datetime.timedelta(seconds=self.expiring_time)
+        super(BinaryImageLink, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return self.binary_image
