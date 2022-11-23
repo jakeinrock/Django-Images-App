@@ -2,37 +2,46 @@
 Tests for images APIs.
 """
 from django.test import TestCase
+from django.core.files.base import File
+
 from django.urls import reverse
 from django.contrib.auth import get_user_model
-from django.core.files.base import File
+from django.core.management import call_command
 
 from rest_framework import status
 from rest_framework.test import APIClient
 
 from PIL import Image as Img
-from PIL import ImageFile
+from io import BytesIO
 
-from images.serializers import ImageSerializer
 from images.models import (
     AccountType,
-    User,
     Image,
+    BinaryImageLink,
 )
 
-from io import BytesIO
 import tempfile
-import os
-from urllib import request as ulreq
+import datetime
+import time
+
 
 IMAGES_URL = reverse('image-list')
+
 
 def detail_url(image_id):
     """Create and return an image detail URL."""
     return reverse('image-detail', args=[image_id])
 
+
+def get_link_url(image_id):
+    """Create and return an binary image upload URL."""
+    return reverse('image-get-link', args=[image_id])
+
+
 def create_user(**params):
     """Create and return a new user."""
     return get_user_model().objects.create_user(**params)
+
 
 def create_account_type(type):
     """Create and return new account type."""
@@ -41,7 +50,7 @@ def create_account_type(type):
             'title': 'Basic',
             'is_basic': True,
             'thumb_size1': 200,
-    }
+        }
     if type == 'Premium':
         params = {
             'title': 'Premium',
@@ -49,7 +58,7 @@ def create_account_type(type):
             'thumb_size1': 400,
             'thumb_size2': 200,
             'link_to_original': True,
-    }
+        }
     if type == 'Enterprise':
         params = {
             'title': 'Enterprise',
@@ -58,7 +67,7 @@ def create_account_type(type):
             'thumb_size2': 200,
             'link_to_original': True,
             'link_to_binary': True,
-    }
+        }
     if type == 'Custom':
         params = {
             'title': 'Custom',
@@ -67,13 +76,17 @@ def create_account_type(type):
             'thumb_size2': 600,
             'link_to_original': True,
             'link_to_binary': True,
-    }
+        }
 
     account_type = AccountType.objects.create(**params)
 
     return account_type
 
-def get_image_file(name='test.png', ext='png', size=(800, 800), color=(256, 0, 0)):
+
+def get_image_file(name='test.png',
+                   ext='png',
+                   size=(800, 800),
+                   color=(256, 0, 0)):
     file_obj = BytesIO()
     image = Img.new("RGBA", size=size, color=color)
     image.save(file_obj, ext)
@@ -126,7 +139,6 @@ class ImageUploadTests(TestCase):
         images = Image.objects.all().order_by('-id')
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(images.count(), 2)
-
 
     def test_get_detail_image(self):
         """Test retrieving a detail image."""
@@ -254,4 +266,76 @@ class ImageUploadTests(TestCase):
 
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         self.assertIn('thumbnail_size1', res.data)
-        self.assertEqual(height, AccountType.objects.filter(users=self.user)[0].thumb_size1)
+        self.assertEqual(
+            height,
+            AccountType.objects.filter(users=self.user)[0].thumb_size1)
+
+    def test_create_binary_image_link(self):
+        """Test creating binary image."""
+        image = Image.objects.create(
+            user=self.user,
+            title='sample',
+            image=get_image_file(),
+        )
+        payload = {'expiring_time': int(300)}
+        url = get_link_url(image.id)
+
+        res = self.client.post(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('binary_image', res.data)
+        self.assertEqual(
+            BinaryImageLink.objects.filter(user=self.user).count(), 1)
+
+
+class PeriodicTasksTest(TestCase):
+    """Test for periodic tasks."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        enterprise = create_account_type(type='Enterprise')
+
+        self.user = create_user(
+            email='username@example.com',
+            password='pass123',
+            account_type=enterprise)
+
+        self.client.force_authenticate(self.user)
+
+    def test_deleting_expired_binary_images_links(self):
+        """Testing deleting expired binary images links."""
+        BinaryImageLink.objects.create(
+            user=self.user,
+            binary_image=get_image_file(),
+            created_at=datetime.datetime.now(),
+            expiration_date=datetime.datetime.now(),
+        )
+
+        binary_id = BinaryImageLink.objects.filter(user=self.user)[0].id
+
+        time.sleep(1)
+
+        call_command('delete_expired_links',)
+
+        self.assertEqual(BinaryImageLink.objects.filter(user=self.user).count(), 0)
+        self.assertFalse(BinaryImageLink.objects.filter(id=binary_id).exists())
+
+    def test_try_to_used_deleted_link(self):
+        """Testing opening a deleted link."""
+        BinaryImageLink.objects.create(
+            user=self.user,
+            binary_image=get_image_file(),
+            created_at=datetime.datetime.now(),
+            expiration_date=datetime.datetime.now(),
+        )
+
+        time.sleep(1)
+
+        link = BinaryImageLink.objects.filter(user=self.user)[0].binary_image
+
+        call_command('delete_expired_links',)
+
+        res2 = self.client.get(link)
+
+        self.assertEqual(res2.status_code, status.HTTP_404_NOT_FOUND)

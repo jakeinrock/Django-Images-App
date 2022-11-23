@@ -3,6 +3,7 @@ Database models.
 """
 import uuid
 import os
+import datetime
 
 import os.path
 from PIL import Image as Img
@@ -16,7 +17,10 @@ from django.contrib.auth.models import (
     PermissionsMixin,
 )
 from django.core.files.base import ContentFile
-from django.core.validators import FileExtensionValidator
+from django.core.validators import (
+    FileExtensionValidator,
+)
+
 
 def create_uuid_filename(filename):
     """Generate uuid file name."""
@@ -25,13 +29,20 @@ def create_uuid_filename(filename):
 
     return filename
 
+
 def image_file_path(instance, filename):
     """Generate file path for image."""
     return os.path.join('uploads', 'images', create_uuid_filename(filename))
 
+
 def thumb_file_path(instance, filename):
     """Generate file path for thumbnail."""
     return os.path.join('uploads', 'thumbs', create_uuid_filename(filename))
+
+
+def binary_file_path(instance, filename):
+    """Generate file path for binary image."""
+    return os.path.join('uploads', 'binary', create_uuid_filename(filename))
 
 
 class UserManager(BaseUserManager):
@@ -72,6 +83,7 @@ class AccountType(models.Model):
     def __str__(self):
         return self.title
 
+
 class User(AbstractBaseUser, PermissionsMixin):
     """User in the system."""
     account_type = models.ForeignKey(
@@ -107,15 +119,24 @@ class Image(models.Model):
             FileExtensionValidator(allowed_extensions=['png', 'jpeg', 'jpg'])
             ]
         )
-    thumbnail_size1 = models.ImageField(null=True, blank=True, upload_to=thumb_file_path)
-    thumbnail_size2 = models.ImageField(null=True, blank=True, upload_to=thumb_file_path)
+    thumbnail_size1 = models.ImageField(
+        null=True,
+        blank=True,
+        upload_to=thumb_file_path
+        )
+    thumbnail_size2 = models.ImageField(
+        null=True,
+        blank=True,
+        upload_to=thumb_file_path
+        )
 
     def save(self, *args, **kwargs):
         """Save instance."""
 
         if not self.make_thumbnail():
             """Set to a default thumbnail."""
-            raise Exception('Could not create thumbnail - is the file type valid?')
+            raise Exception(
+                'Could not create thumbnail - is the file type valid?')
 
         super(Image, self).save(*args, **kwargs)
 
@@ -152,12 +173,49 @@ class Image(models.Model):
             temp_thumb.seek(0)
 
             if thumb_no == 'thumb1':
-                self.thumbnail_size1.save(thumb_filename, ContentFile(temp_thumb.read()), save=False)
+                self.thumbnail_size1.save(
+                    thumb_filename,
+                    ContentFile(temp_thumb.read()),
+                    save=False)
             if thumb_no == 'thumb2':
-                self.thumbnail_size2.save(thumb_filename, ContentFile(temp_thumb.read()), save=False)
+                self.thumbnail_size2.save(
+                    thumb_filename,
+                    ContentFile(temp_thumb.read()),
+                    save=False)
             temp_thumb.close()
 
         return True
 
     def __str__(self):
         return self.title
+
+
+class BinaryImageLink(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        related_name='links',
+        on_delete=models.CASCADE,
+    )
+    binary_image = models.ImageField(
+        null=True,
+        blank=True,
+        upload_to=binary_file_path
+        )
+    expiring_time = models.IntegerField(
+        blank=False,
+        null=True,)
+    created_at = models.DateTimeField(
+        editable=False,
+        default=datetime.datetime.now()
+        )
+    expiration_date = models.DateTimeField(default=None)
+
+    def save(self, *args, **kwargs):
+        """Save instance."""
+        if self.expiration_date is None:
+            self.expiration_date = datetime.datetime.now() + datetime.timedelta(
+                seconds=self.expiring_time)
+        super(BinaryImageLink, self).save(*args, **kwargs)
+
+    def __str__(self):
+        return self.binary_image

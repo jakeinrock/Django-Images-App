@@ -3,3 +3,5 @@ djangorestframework>=3.13.1,<3.14
 psycopg2>=2.8.6,<2.9
 Pillow
 drf-spectacular
+celery==5.1.2
+redis==3.5.3

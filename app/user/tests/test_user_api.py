@@ -8,12 +8,15 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 
+
 TOKEN_URL = reverse('user:token')
 IMAGES_URL = reverse('image-list')
+
 
 def create_user(**params):
     """Create and return new user."""
     return get_user_model().objects.create_user(**params)
+
 
 class PublicUserApiTests(TestCase):
     """Test the public features of the user API"""
