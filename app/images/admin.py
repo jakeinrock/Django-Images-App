@@ -52,11 +52,12 @@ class UserAdmin(BaseUserAdmin):
         }),
     )
 
+
 class AccountAdmin(admin.ModelAdmin):
     """Define the admin pages for account types."""
 
     ordering = ['id']
-    list_display = ['title',]
+    list_display = ['title', ]
     fieldsets = (
         (None, {'fields': ('title',)}),
         (

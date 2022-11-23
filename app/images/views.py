@@ -1,7 +1,6 @@
 """
 Views for images app.
 """
-from rest_framework import viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import (
@@ -13,16 +12,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .serializers import ImageSerializer, BinaryImageLinkSerializer
-from .models import Image, AccountType, BinaryImageLink
+from .models import Image, BinaryImageLink
 
 from PIL import Image as Img
 
 from django.core.files import File
+from django.core.files.base import ContentFile
+from django.conf import settings
 
 import os
 from io import BytesIO
-
-from django.core.files.base import ContentFile
 
 
 class ImageViewSet(mixins.DestroyModelMixin,
@@ -59,6 +58,7 @@ class ImageViewSet(mixins.DestroyModelMixin,
             image = self.get_object()
             img_img = image.image
             expiring_link_time = int(request.data['expiring_time'])
+            host = os.environ.get('ALLOWED_HOSTS')
 
             img = Img.open(img_img).convert('1')
 
@@ -82,15 +82,19 @@ class ImageViewSet(mixins.DestroyModelMixin,
             if serializer.is_valid():
 
                 binary_image = BinaryImageLink()
-                binary_image.binary_image = File(ContentFile(temp_binary.read()), binary_filename)
+                binary_image.binary_image = File(
+                    ContentFile(temp_binary.read()),
+                    binary_filename)
                 binary_image.user = self.request.user
                 binary_image.expiring_time = expiring_link_time
                 binary_image.save()
 
-                user_binaries = BinaryImageLink.objects.filter(user=self.request.user).order_by('-id')
+                user_binaries = BinaryImageLink.objects.filter(
+                    user=self.request.user).order_by('-id')
                 bin_info = {}
                 binary_path = str(user_binaries[0].binary_image)
-                bin_info['binary_image'] = str('http://localhost:8000/static/media/'+binary_path)
+                bin_info['binary_image'] = str(
+                    'http://'+host+':8000'+settings.MEDIA_URL+binary_path)
                 msg = bin_info
                 status_code = status.HTTP_200_OK
 
@@ -104,28 +108,3 @@ class ImageViewSet(mixins.DestroyModelMixin,
 
         finally:
             return Response(msg, status=status_code)
-    # @action(methods=['GET'], detail=True, url_path='get-link')
-    # def get_link(self, request, pk=None):
-    #     """Get expiring link for binary image."""
-    #     try:
-    #         image = self.get_object()
-    #         img_img = image.image
-
-    #         binary_image = BinaryImageLink()
-    #         binary_image.binary_image = File(img_img, img_img.name)
-    #         binary_image.user = self.request.user
-    #         binary_image.save()
-
-    #         user_binaries = BinaryImageLink.objects.filter(user=self.request.user).order_by('-id')
-    #         bin_image = {}
-    #         binary_path = str(user_binaries[0].binary_image)
-    #         bin_image['binary_image'] = binary_path
-    #         msg = bin_image
-    #         status_code = status.HTTP_200_OK
-
-    #     except Exception as err:
-    #         msg = f'Some problems occured: {err}'
-    #         status_code = status.HTTP_400_BAD_REQUEST
-
-    #     finally:
-    #         return Response(msg, status=status_code)

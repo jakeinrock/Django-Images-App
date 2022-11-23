@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 
 from images import models
 
+
 class ModelTests(TestCase):
     """Test models."""
 
