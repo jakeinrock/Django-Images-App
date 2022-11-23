@@ -270,8 +270,8 @@ class ImageUploadTests(TestCase):
             height,
             AccountType.objects.filter(users=self.user)[0].thumb_size1)
 
-    def test_create_binary_image_link(self):
-        """Test creating binary image."""
+    def test_create_binary_image_link_not_allowed(self):
+        """Test creating binary image not allowed for basic account type."""
         image = Image.objects.create(
             user=self.user,
             title='sample',
@@ -282,10 +282,8 @@ class ImageUploadTests(TestCase):
 
         res = self.client.post(url, payload, format='json')
 
-        self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.assertIn('binary_image', res.data)
-        self.assertEqual(
-            BinaryImageLink.objects.filter(user=self.user).count(), 1)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertNotIn('binary_image', res.data)
 
 
 class PeriodicTasksTest(TestCase):
@@ -302,6 +300,23 @@ class PeriodicTasksTest(TestCase):
             account_type=enterprise)
 
         self.client.force_authenticate(self.user)
+
+    def test_create_binary_image_link(self):
+        """Test creating binary image."""
+        image = Image.objects.create(
+            user=self.user,
+            title='sample',
+            image=get_image_file(),
+        )
+        payload = {'expiring_time': int(300)}
+        url = get_link_url(image.id)
+
+        res = self.client.post(url, payload, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn('binary_image', res.data)
+        self.assertEqual(
+            BinaryImageLink.objects.filter(user=self.user).count(), 1)
 
     def test_deleting_expired_binary_images_links(self):
         """Testing deleting expired binary images links."""
