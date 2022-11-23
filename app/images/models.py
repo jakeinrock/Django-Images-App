@@ -219,7 +219,7 @@ class BinaryImageLink(models.Model):
             MinValueValidator(300),
             MaxValueValidator(30000),
     ])
-    created_at = models.DateTimeField(editable=False, default=timezone.now)
+    created_at = models.DateTimeField(editable=False, default=datetime.datetime.now())
     expiration_date = models.DateTimeField(default=None)
 
     def save(self, *args, **kwargs):

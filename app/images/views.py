@@ -24,6 +24,7 @@ from io import BytesIO
 
 from django.core.files.base import ContentFile
 
+
 class ImageViewSet(mixins.DestroyModelMixin,
                    mixins.ListModelMixin,
                    mixins.CreateModelMixin,
