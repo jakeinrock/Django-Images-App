@@ -214,11 +214,7 @@ class BinaryImageLink(models.Model):
     binary_image = models.ImageField(null=True, blank=True, upload_to=binary_file_path)
     expiring_time = models.IntegerField(
         blank=False,
-        null=True,
-        validators=[
-            MinValueValidator(300),
-            MaxValueValidator(30000),
-    ])
+        null=True,)
     created_at = models.DateTimeField(editable=False, default=datetime.datetime.now())
     expiration_date = models.DateTimeField(default=None)
 

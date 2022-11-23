@@ -41,8 +41,10 @@ class ImageViewSet(mixins.DestroyModelMixin,
         return self.queryset.filter(user=self.request.user).order_by('-id')
 
     def get_serializer_class(self):
-        if self.action == 'list' or self.action == 'upload':
+        if self.action == 'list':
             return ImageSerializer
+        if self.action == 'get_link':
+            return BinaryImageLinkSerializer
 
         return self.serializer_class
 
@@ -54,10 +56,9 @@ class ImageViewSet(mixins.DestroyModelMixin,
     def get_link(self, request, pk=None):
         """Get expiring link for binary image."""
         try:
-            # serializer = BinaryImageLinkSerializer
             image = self.get_object()
             img_img = image.image
-            expiring_link_time = request.data['expiring_time']
+            expiring_link_time = int(request.data['expiring_time'])
 
             img = Img.open(img_img).convert('1')
 
@@ -76,20 +77,26 @@ class ImageViewSet(mixins.DestroyModelMixin,
             img.save(temp_binary, FTYPE)
             temp_binary.seek(0)
 
-            binary_image = BinaryImageLink()
-            binary_image.binary_image = File(ContentFile(temp_binary.read()), binary_filename)
-            binary_image.user = self.request.user
-            binary_image.expiring_time = expiring_link_time
-            binary_image.save()
+            serializer = self.get_serializer(data=request.data)
 
-            user_binaries = BinaryImageLink.objects.filter(user=self.request.user).order_by('-id')
-            bin_info = {}
-            binary_path = str(user_binaries[0].binary_image)
-            bin_info['binary_image'] = binary_path
-            bin_info['created_at'] = user_binaries[0].created_at
-            bin_info['expiration_date'] = user_binaries[0].expiration_date
-            msg = bin_info
-            status_code = status.HTTP_200_OK
+            if serializer.is_valid():
+
+                binary_image = BinaryImageLink()
+                binary_image.binary_image = File(ContentFile(temp_binary.read()), binary_filename)
+                binary_image.user = self.request.user
+                binary_image.expiring_time = expiring_link_time
+                binary_image.save()
+
+                user_binaries = BinaryImageLink.objects.filter(user=self.request.user).order_by('-id')
+                bin_info = {}
+                binary_path = str(user_binaries[0].binary_image)
+                bin_info['binary_image'] = str('http://localhost:8000/static/media/'+binary_path)
+                msg = bin_info
+                status_code = status.HTTP_200_OK
+
+            else:
+                msg = serializer.errors
+                status_code = status.HTTP_400_BAD_REQUEST
 
         except Exception as err:
             msg = f'Some problems occured: {err}'

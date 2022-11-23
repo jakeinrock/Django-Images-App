@@ -5,6 +5,26 @@ from rest_framework import serializers
 
 from images.models import Image, AccountType, BinaryImageLink
 
+from django.conf import settings
+
+
+
+class BinaryImageLinkSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BinaryImageLink
+        fields = ['id', 'expiring_time',]
+        read_only_fields = ['id',]
+        extra_kwargs = {'expiring_time': {'required': 'True'}}
+
+    def validate(self, data):
+        """
+        Check if provided link expiration time is in range between 300 and 30000.
+        """
+        if int(data['expiring_time']) <= 299 or int(data['expiring_time']) >= 30001 or int(data['expiring_time']) %300 != 0:
+            raise serializers.ValidationError({
+                "Expiration time should be a multiplication of 300sec(5min) and should be in range between 300 and 30000 seconds"})
+        return data
+
 class ImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = Image
@@ -31,7 +51,4 @@ class ImageSerializer(serializers.ModelSerializer):
             data.pop('thumbnail_size2', None)
         return data
 
-class BinaryImageLinkSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = BinaryImageLink
-        fields = ['expiring_time',]
+

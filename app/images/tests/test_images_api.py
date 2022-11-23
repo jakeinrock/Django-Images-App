@@ -5,6 +5,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from django.core.files.base import File
+from django.core.management import call_command
 
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -24,6 +25,11 @@ from io import BytesIO
 import tempfile
 import os
 from urllib import request as ulreq
+
+import datetime
+from pytz import timezone as tz
+from django.conf import settings
+import time
 
 IMAGES_URL = reverse('image-list')
 
@@ -268,11 +274,64 @@ class ImageUploadTests(TestCase):
             title='sample',
             image=get_image_file(),
         )
-        payload = {'expiring_time': 600}
+        payload = {'expiring_time': 300}
         url = get_link_url(image.id)
 
         res = self.client.post(url, payload, format='json')
-        print(res.data)
+
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn('binary_image', res.data)
         self.assertEqual(BinaryImageLink.objects.filter(user=self.user).count(), 1)
+
+
+class PeriodicTasksTest(TestCase):
+    """Test for periodic tasks."""
+
+    def setUp(self):
+        self.client = APIClient()
+
+        enterprise = create_account_type(type='Enterprise')
+
+        self.user = create_user(
+            email='username@example.com',
+            password='pass123',
+            account_type=enterprise)
+
+        self.client.force_authenticate(self.user)
+
+    def test_deleting_expired_binary_images_links(self):
+        """Testing deleting expired binary images links."""
+        binary_image = BinaryImageLink.objects.create(
+            user=self.user,
+            binary_image=get_image_file(),
+            created_at=datetime.datetime.now(),
+            expiration_date=datetime.datetime.now(),
+        )
+
+        binary_id = BinaryImageLink.objects.filter(user=self.user)[0].id
+
+        time.sleep(1)
+
+        call_command('delete_expired_links',)
+
+        self.assertEqual(BinaryImageLink.objects.filter(user=self.user).count(), 0)
+        self.assertFalse(BinaryImageLink.objects.filter(id=binary_id).exists())
+
+    def test_try_to_used_deleted_link(self):
+        """Testing opening a deleted link."""
+        binary_image = BinaryImageLink.objects.create(
+            user=self.user,
+            binary_image=get_image_file(),
+            created_at=datetime.datetime.now(),
+            expiration_date=datetime.datetime.now(),
+        )
+
+        time.sleep(1)
+
+        link = BinaryImageLink.objects.filter(user=self.user)[0].binary_image
+
+        call_command('delete_expired_links',)
+
+        res2 = self.client.get(link)
+
+        self.assertEqual(res2.status_code, status.HTTP_404_NOT_FOUND)
