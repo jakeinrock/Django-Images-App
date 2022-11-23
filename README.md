@@ -3,6 +3,10 @@
 ## Description
 The project is a backend REST API built with TDD (Test Driven Development) process approach.
 
+## Live preview
+
+https://www.youtube.com/watch?v=-L4VRQbty34
+
 **Django Images App handles:**
 
 * Registration part has been skipped. It is assumed that users are created via the admin panel
